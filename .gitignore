@@ -1,0 +1,8 @@
+/build/
+/output/
+[Bb]in/
+[Ll]ib/
+coverage.xml
+testResults.xml
+.vscode/
+*.git-credentials

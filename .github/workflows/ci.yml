@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.shell }})
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The manifest promises Windows PowerShell 5.1 and PowerShell 7; test both
+        shell: [powershell, pwsh]
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # GitVersion needs the full history to determine the next version
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v4
+        with:
+          versionSpec: '6.x'
+
+      - name: Put GitVersion on PATH
+        # The setup action exposes GITVERSION_PATH but does not add it to PATH,
+        # and installs the tool as dotnet-gitversion.exe. The GetNextVersion
+        # build task shells out to bare 'gitversion', so expose it under that
+        # name via a shim.
+        run: |
+          $exe = Get-ChildItem -Path $env:GITVERSION_PATH -Filter '*gitversion*.exe' -Recurse |
+              Select-Object -First 1
+          if (-not $exe) { throw "No gitversion executable found under $env:GITVERSION_PATH" }
+
+          $shim = Join-Path $env:RUNNER_TEMP 'gitversion-shim'
+          New-Item -ItemType Directory -Path $shim -Force | Out-Null
+          if ($exe.Name -eq 'gitversion.exe') {
+              $dir = $exe.Directory.FullName
+          }
+          else {
+              Set-Content -Path (Join-Path $shim 'gitversion.cmd') `
+                  -Value "@echo off`r`n`"$($exe.FullName)`" %*" -Encoding ascii
+              $dir = $shim
+          }
+          $dir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Verify GitVersion is callable
+        # Same invocation the GetNextVersion task uses, so this fails here
+        # with a clear message rather than deep inside the build.
+        run: (gitversion | ConvertFrom-Json).MajorMinorPatch
+
+      - name: Resolve dependencies
+        run: |
+          Install-Module PSDepend -Force -Scope CurrentUser
+          Invoke-PSDepend -Path .\PlaceholderModule.depend.psd1 -Force
+          # PSDepend installs to build\modules and only puts it on PSModulePath
+          # for its own session; each step is a fresh shell, so persist it or
+          # Invoke-Build is not found in later steps.
+          "PSModulePath=$env:GITHUB_WORKSPACE\build\modules;$env:PSModulePath" |
+              Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Analyze
+        # Once, on 7: PSScriptAnalyzer checks verbs against the running engine's list, and 5.1's
+        # predates Build, so the same source gets different findings. The 5.1 leg still builds
+        # and runs every test.
+        if: matrix.shell == 'pwsh'
+        run: .\build.ps1 -Task Analyze
+
+      - name: Build
+        run: .\build.ps1 -Task Build
+
+      - name: Test
+        run: .\build.ps1 -Task Test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-results-${{ matrix.shell }}
+          path: |
+            build/testResults.xml
+            build/codecoverage.xml
