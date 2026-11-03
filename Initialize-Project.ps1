@@ -56,12 +56,13 @@ foreach ($file in $files) {
 
 $manifestPath = Join-Path $PSScriptRoot "source/$placeholder.psd1"
 if ($PSCmdlet.ShouldProcess($manifestPath, 'Set the GUID, description and tags')) {
-    $tagList = if ($Tag) { ($Tag | ForEach-Object { "'$($_ -replace "'", "''")'" }) -join ', ' } else { '@()' }
+    $tagList = if ($Tag) { ($Tag | ForEach-Object { "'$($_ -replace "'", "''")'" }) -join ', ' } else { "'PowerShell'" }
 
     $manifest = [System.IO.File]::ReadAllText($manifestPath)
-    $manifest = $manifest -replace '00000000-0000-0000-0000-000000000000', [guid]::NewGuid()
+    # Every copy of the template shares its GUID until this gives it one of its own
+    $manifest = $manifest -replace "(GUID\s+= )'[0-9a-f-]+'", "`$1'$([guid]::NewGuid())'"
     $manifest = $manifest -replace "'ModuleDescription'", "'$($Description -replace "'", "''")'"
-    $manifest = $manifest -replace 'Tags(\s+)= @\(\)', "Tags`$1= $tagList"
+    $manifest = $manifest -replace "Tags(\s+)= 'PowerShell'", "Tags`$1= $tagList"
     [System.IO.File]::WriteAllText($manifestPath, $manifest)
 }
 
