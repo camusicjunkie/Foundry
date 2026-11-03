@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Run once, from the root of a repository created from the template. Replaces the
-    PlaceholderModule placeholder in every file and file name, gives the manifest a new GUID and its
+    PlaceholderModule placeholder in every file and file name, gives the manifest its
     description and tags, then deletes this script. Commit the result.
 
 .EXAMPLE
@@ -55,12 +55,10 @@ foreach ($file in $files) {
 }
 
 $manifestPath = Join-Path $PSScriptRoot "source/$placeholder.psd1"
-if ($PSCmdlet.ShouldProcess($manifestPath, 'Set the GUID, description and tags')) {
+if ($PSCmdlet.ShouldProcess($manifestPath, 'Set the description and tags')) {
     $tagList = if ($Tag) { ($Tag | ForEach-Object { "'$($_ -replace "'", "''")'" }) -join ', ' } else { "'PowerShell'" }
 
     $manifest = [System.IO.File]::ReadAllText($manifestPath)
-    # Every copy of the template shares its GUID until this gives it one of its own
-    $manifest = $manifest -replace "(GUID\s+= )'[0-9a-f-]+'", "`$1'$([guid]::NewGuid())'"
     $manifest = $manifest -replace "'ModuleDescription'", "'$($Description -replace "'", "''")'"
     $manifest = $manifest -replace "Tags(\s+)= 'PowerShell'", "Tags`$1= $tagList"
     [System.IO.File]::WriteAllText($manifestPath, $manifest)
