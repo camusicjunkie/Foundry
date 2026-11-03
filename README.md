@@ -14,8 +14,8 @@
 > 1. **Use this template → Create a new repository**, named for the module, and clone it.
 > 2. From the clone, run
 >    `./Initialize-Project.ps1 -Description 'What the module does.' -Tag Some, Tags`.
->    It replaces `PlaceholderModule` everywhere with the repository's name (or `-Name`), sets the
->    manifest's description and tags, removes the example `Get-Greeting` function and its tests (unless
+>    It replaces `PlaceholderModule` everywhere with the repository's name (or `-Name`), gives the
+>    manifest a new GUID, removes the example `Get-Greeting` function and its tests (unless
 >    `-KeepExample`), removes this note and deletes itself.
 > 3. Review with `git status`, commit, and push. CI runs on the push.
 > 4. Before the first release, add a PowerShell Gallery API key as the `NUGET_API_KEY` repository
